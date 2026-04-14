@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptForge — Text to Prompt Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --accent: #7b6ef6;
+    --accent2: #a78bfa;
+    --accent-dim: rgba(123,110,246,0.15);
+    --text: #f0effe;
+    --muted: #7a7890;
+    --muted2: #a09fbb;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --coral: #f87171;
+    --teal: #2dd4bf;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(123,110,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(123,110,246,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .glow {
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 800px; height: 500px;
+    background: radial-gradient(ellipse, rgba(123,110,246,0.12) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 52px;
+  }
+
+  .logo-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(123,110,246,0.3);
+    border-radius: 100px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .logo-dot {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(36px, 6vw, 58px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #fff 30%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+  }
+
+  .subtitle {
+    font-size: 16px;
+    color: var(--muted2);
+    font-weight: 300;
+    max-width: 440px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* API Key section */
+  .api-section {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .api-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  .api-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .api-input:focus { border-color: var(--accent); }
+
+  .api-status {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+
+  .status-dot.ok { background: var(--green); }
+  .status-dot.err { background: var(--coral); }
+
+  /* Main card */
+  .main-card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .card-top {
+    padding: 28px 28px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .input-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .main-textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 300;
+    color: var(--text);
+    resize: none;
+    min-height: 110px;
+    outline: none;
+    line-height: 1.6;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .main-textarea::placeholder { color: var(--muted); }
+
+  .main-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(123,110,246,0.12);
+  }
+
+  .examples-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .chip {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 100px;
+    padding: 5px 13px;
+    font-size: 12px;
+    color: var(--muted2);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .chip:hover {
+    border-color: var(--accent);
+    color: var(--accent2);
+    background: var(--accent-dim);
+  }
+
+  .card-bottom {
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .technique-info {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .btn-generate {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 11px 28px;
+    border-radius: 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    letter-spacing: 0.02em;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-generate:hover { background: #6d60e8; transform: translateY(-1px); }
+  .btn-generate:active { transform: translateY(0); }
+  .btn-generate:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .spinner {
+    width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.65s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Output */
+  #output { display: none; }
+
+  .output-wrap {
+    margin-top: 28px;
+    animation: fadeUp 0.35s ease;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .intent-strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    margin-bottom: 16px;
+  }
+
+  .intent-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .intent-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 11px;
+    border-radius: 100px;
+    letter-spacing: 0.03em;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .b-purple { background: rgba(123,110,246,0.15); color: #a78bfa; border: 1px solid rgba(167,139,250,0.25); }
+  .b-teal   { background: rgba(45,212,191,0.1);  color: #2dd4bf;  border: 1px solid rgba(45,212,191,0.25); }
+  .b-amber  { background: rgba(251,191,36,0.1);  color: #fbbf24;  border: 1px solid rgba(251,191,36,0.25); }
+  .b-coral  { background: rgba(248,113,113,0.1); color: #f87171;  border: 1px solid rgba(248,113,113,0.25); }
+  .b-green  { background: rgba(74,222,128,0.1);  color: #4ade80;  border: 1px solid rgba(74,222,128,0.25); }
+  .b-blue   { background: rgba(96,165,250,0.1);  color: #60a5fa;  border: 1px solid rgba(96,165,250,0.25); }
+
+  .sections-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .sec {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .sec:hover { border-color: var(--border2); }
+
+  .sec-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sec-icon {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .sec-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .sec-body {
+    padding: 16px 18px;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--muted2);
+    white-space: pre-wrap;
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted2);
+    padding: 9px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent2); background: var(--accent-dim); }
+
+  .btn-primary {
+    background: var(--accent);
+    border: none;
+    color: white;
+    padding: 9px 22px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .btn-primary:hover { background: #6d60e8; }
+
+  .err-box {
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.25);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: #f87171;
+    margin-top: 20px;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 60px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Technique map table */
+  .map-section {
+    margin-top: 52px;
+  }
+
+  .map-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+
+  .map-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+
+  .map-intent { font-size: 12px; color: var(--muted2); margin-bottom: 6px; }
+  .map-style  { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent2); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-pill"><div class="logo-dot"></div> Prompt Engine</div>
+    <h1>Plain text.<br>Perfect prompt.</h1>
+    <p class="subtitle">Paste any rough idea. We detect the intent, pick the right technique, and generate a structured prompt.</p>
+  </div>
+
+  <!-- API Key -->
+  <div class="api-section">
+    <span class="api-label">Anthropic API Key</span>
+    <input type="password" class="api-input" id="apiKey" placeholder="sk-ant-..." oninput="checkKey()" />
+    <span class="api-status" id="apiStatus">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText" style="color:var(--muted);">Enter key to begin</span>
+    </span>
+  </div>
+
+  <!-- Main input card -->
+  <div class="main-card">
+    <div class="card-top">
+      <span class="input-label">Your idea</span>
+      <textarea class="main-textarea" id="userInput" rows="4"
+        placeholder="e.g. give me startup ideas for students&#10;e.g. help me fix a bug in my Python code&#10;e.g. write a cold email to potential investors"></textarea>
+      <div class="examples-row">
+        <span class="chip" onclick="fill('give me startup ideas for students')">startup ideas for students</span>
+        <span class="chip" onclick="fill('help me debug my Python code')">debug Python code</span>
+        <span class="chip" onclick="fill('write a cold email to investors')">cold email to investors</span>
+        <span class="chip" onclick="fill('explain machine learning to a 10-year-old')">explain ML simply</span>
+        <span class="chip" onclick="fill('help me plan a 30-day fitness routine')">fitness plan</span>
+        <span class="chip" onclick="fill('analyze pros and cons of moving to a new city')">pros & cons analysis</span>
+      </div>
+    </div>
+    <div class="card-bottom">
+      <span class="technique-info" id="techniqueHint">Technique auto-selected based on intent</span>
+      <button class="btn-generate" id="genBtn" onclick="generate()">
+        <span id="btnInner">Generate prompt →</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Output -->
+  <div id="output"></div>
+
+  <!-- Technique map -->
+  <div class="map-section">
+    <p class="map-title">Technique engine</p>
+    <div class="map-grid">
+      <div class="map-card"><div class="map-intent">Simple factual task</div><div class="map-style">Zero-shot</div></div>
+      <div class="map-card"><div class="map-intent">Structured output</div><div class="map-style">Few-shot</div></div>
+      <div class="map-card"><div class="map-intent">Creative ideation</div><div class="map-style">Explorative</div></div>
+      <div class="map-card"><div class="map-intent">Problem solving</div><div class="map-style">Chain-of-thought</div></div>
+      <div class="map-card"><div class="map-intent">Expert advice</div><div class="map-style">Role prompting</div></div>
+      <div class="map-card"><div class="map-intent">Step-by-step tasks</div><div class="map-style">Step-by-step</div></div>
+    </div>
+  </div>
+
+  <div class="footer">PromptForge — powered by Claude API &nbsp;·&nbsp; Your key is never stored</div>
+</div>
+
+<script>
+const SECTIONS = [
+  { key: 'role',        label: 'Role',        icon: '👤', accent: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
+  { key: 'context',     label: 'Context',     icon: '🧠', accent: '#2dd4bf', bg: 'rgba(45,212,191,0.1)' },
+  { key: 'task',        label: 'Task',        icon: '📝', accent: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
+  { key: 'tone',        label: 'Tone',        icon: '🎨', accent: '#f87171', bg: 'rgba(248,113,113,0.1)' },
+  { key: 'constraints', label: 'Constraints', icon: '⚙️', accent: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
+];
+
+const TC_CLASS = {
+  'Zero-shot': 'b-blue', 'Few-shot': 'b-teal', 'Chain-of-thought': 'b-purple',
+  'Role prompting': 'b-coral', 'Explorative': 'b-amber', 'Step-by-step': 'b-green'
+};
+
+function fill(text) {
+  document.getElementById('userInput').value = text;
+  document.getElementById('output').innerHTML = '';
+  document.getElementById('output').style.display = 'none';
+}
+
+function checkKey() {
+  const key = document.getElementById('apiKey').value.trim();
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (key.startsWith('sk-ant-') && key.length > 20) {
+    dot.className = 'status-dot ok';
+    txt.textContent = 'Key looks valid';
+    txt.style.color = '#4ade80';
+  } else if (key.length > 0) {
+    dot.className = 'status-dot err';
+    txt.textContent = 'Key format invalid';
+    txt.style.color = '#f87171';
+  } else {
+    dot.className = 'status-dot';
+    txt.textContent = 'Enter key to begin';
+    txt.style.color = 'var(--muted)';
+  }
+}
+
+async function generate() {
+  const key = document.getElementById('apiKey').value.trim();
+  const input = document.getElementById('userInput').value.trim();
+  const outputEl = document.getElementById('output');
+
+  if (!key) { alert('Please enter your Anthropic API key first.'); return; }
+  if (!input) { alert('Please enter your idea or text.'); return; }
+
+  const btn = document.getElementById('genBtn');
+  const btnInner = document.getElementById('btnInner');
+  btn.disabled = true;
+  btnInner.innerHTML = '<span class="spinner"></span>';
+  outputEl.innerHTML = '';
+  outputEl.style.display = 'none';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 1024,
+        system: `You are an expert prompt engineer. Analyze user input, detect intent, choose the best prompting techniques, and generate a structured prompt.
+
+Respond ONLY with a valid JSON object (no markdown, no backticks, no extra text):
+{
+  "intent": "short intent description",
+  "techniques": ["Technique1", "Technique2"],
+  "role": "The role/persona the AI should adopt",
+  "context": "Relevant context and background information",
+  "task": "Clear specific task description",
+  "tone": "The tone and style to use",
+  "constraints": "Key constraints and requirements"
+}
+
+Technique options (pick 1-3): Zero-shot, Few-shot, Chain-of-thought, Role prompting, Explorative, Step-by-step.`,
+        messages: [{ role: 'user', content: input }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw = (data.content || []).map(b => b.text || '').join('');
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    renderOutput(parsed);
+
+  } catch(e) {
+    outputEl.innerHTML = `<div class="err-box"><strong>Error:</strong> ${escHtml(e.message)}</div>`;
+    outputEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btnInner.textContent = 'Generate prompt →';
+  }
+}
+
+function renderOutput(data) {
+  const outputEl = document.getElementById('output');
+
+  const badges = (data.techniques || [])
+    .map(t => `<span class="badge ${TC_CLASS[t] || 'b-purple'}">${t}</span>`)
+    .join('');
+
+  const sections = SECTIONS.map(s => {
+    if (!data[s.key]) return '';
+    return `<div class="sec">
+      <div class="sec-head">
+        <div class="sec-icon" style="background:${s.bg};">${s.icon}</div>
+        <span class="sec-title" style="color:${s.accent};">${s.label}</span>
+      </div>
+      <div class="sec-body">${escHtml(data[s.key])}</div>
+    </div>`;
+  }).join('');
+
+  window._prompt = SECTIONS
+    .filter(s => data[s.key])
+    .map(s => `${s.label}:\n${data[s.key]}`)
+    .join('\n\n');
+
+  outputEl.innerHTML = `<div class="output-wrap">
+    <div class="intent-strip">
+      <span class="intent-label">Intent</span>
+      <span class="intent-value">${escHtml(data.intent || '')}</span>
+      <div class="badges">${badges}</div>
+    </div>
+    <div class="sections-grid">${sections}</div>
+    <div class="action-row">
+      <button class="btn-secondary" onclick="copyPrompt(event)">Copy full prompt</button>
+    </div>
+  </div>`;
+
+  outputEl.style.display = 'block';
+}
+
+function copyPrompt(e) {
+  if (!window._prompt) return;
+  navigator.clipboard.writeText(window._prompt).then(() => {
+    e.target.textContent = 'Copied!';
+    setTimeout(() => e.target.textContent = 'Copy full prompt', 1800);
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('userInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generate();
+});
+</script>
+</body>
+</html>
